@@ -2,18 +2,34 @@
 #pragma once
 #include "Map.h"
 #include "Snake.h"
+#include "ItemManager.h"
+#include "Item.h"
 #include <chrono>
 using namespace std::chrono;
 
 class SnakeGame{
     Map map;
     Snake snake;
+    ItemManager itemManager;
     bool game_over = false;
     steady_clock::time_point last_move;
 public:
     SnakeGame(int height, int width) : map(height, width), snake() {
         map = Map(height, width);
         initialize(0);  // 초기시작 0단계
+    }
+
+    // 메인 게임 루프
+    void run() {
+        redraw();
+        while (!checkOver()) {
+            userInput();
+            if (isTimeToMove()) {
+                last_move = steady_clock::now();
+                updateGame();
+            }
+            redraw();
+        }
     }
 
     void initialize(int stagenum){
@@ -26,14 +42,14 @@ public:
         last_move = steady_clock::now();  // 초기화 당시 시간 측정
     }
 
-    // 게임오버 체크 함수
+    // 게임오버 체크
     bool checkOver()
     {
         return game_over;
     }
 
-    // 입력한 키를 input으로 받고 진행방향과 반대방향이 아니면 input을 진행 방향으로 갱신
-    void UserInput(){
+    // 사용자 입력 처리
+    void userInput() { 
         int input = map.getInput();
         if (input == ERR) return;
 
@@ -66,18 +82,51 @@ public:
         }
     }
 
-    // 현재 시각을 now로 체크 후 가장 마지막에 체크된 시간, 즉 가장 마지막으로 움직인 시각과의 차이가
-    // 1초 이상이라면 last_move 갱신 후 뱀 이동
-    void runGame(){
+    // 일정 시간 경과 확인
+    bool isTimeToMove() { 
         auto now = steady_clock::now();
-        if (duration_cast<milliseconds>(now - last_move).count() >= 1000){
-            last_move = now;
-            SnakePiece next = snake.nextHead();
-            controlNext(next);
+        return duration_cast<milliseconds>(now - last_move).count() >= 1000;
+    }
+
+    // 게임 상태 업데이트
+    void updateGame() { 
+        SnakePiece next = snake.nextHead();
+        auto item = itemManager.checkCollision(next);
+
+        if (item) {
+            handleItemCollision(next, *item);
+        } else {
+            moveSnakeToNext(next);
+        }
+        itemManager.update(map, snake);
+    }
+
+    // 아이템 충돌 처리
+    void handleItemCollision(const SnakePiece& next, ItemType itemType) {
+        if (itemType == ItemType::GROWTH) {
+            snake.head().setIcon('#');
+            map.addChar(snake.head().getY(), snake.head().getX(), '#');
+
+            snake.addPiece(next);
+            map.addChar(next.getY(), next.getX(), '%');
+        } else if (itemType == ItemType::POISON) {
+            if (snake.getSize() <= 3) {
+                game_over = true;
+                return;
+            }
+            map.addChar(snake.tail().getY(), snake.tail().getX(), ' ');
+            snake.removePiece();
+
+            snake.head().setIcon('#');
+            map.addChar(snake.head().getY(), snake.head().getX(), '#');
+
+            snake.addPiece(next);
+            map.addChar(next.getY(), next.getX(), '%');
         }
     }
 
-    void controlNext(SnakePiece next){
+     // 일반 이동 처리
+    void moveSnakeToNext(SnakePiece next){
         int nextRow = next.getY();
         int nextCol = next.getX();
 

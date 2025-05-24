@@ -14,11 +14,11 @@ public:
     // row, col, icon을 각각 y, x, ch로 초기화
     SnakePiece(int y, int x, char ch) : row(y), col(x), icon(ch) {}
 
-    int getX(){
+    int getX() const {
         return col;
     }
 
-    int getY(){
+    int getY() const {
         return row;
     }
 
@@ -59,7 +59,7 @@ public:
         snake.push(piece);
     }
 
-    // 머리 쪽 부분 삭제
+    // 꼬리 쪽 부분 삭제
     void removePiece(){
         snake.pop();
     }
