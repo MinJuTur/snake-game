@@ -5,6 +5,7 @@
 #include "ItemManager.h"
 #include "Item.h"
 #include "GateManager.h"
+#include "WallManager.h"
 #include <chrono>
 using namespace std::chrono;
 
@@ -13,9 +14,11 @@ class SnakeGame{
     Snake snake;
     ItemManager itemManager;
     GateManager gateManager;
+    WallManager wallManager;
     
     bool game_over = false;
     steady_clock::time_point last_move;
+    int current_stage = 0;
     int moveDelay = 300;
 public:
     SnakeGame(int height, int width) : map(height, width), snake() {
@@ -41,6 +44,8 @@ public:
                 
                 itemManager.update(map, snake);
                 gateManager.update(map, snake.getSize(), snake);
+                wallManager.update(map, snake, true);
+                checkStageClear();
                 redraw();
             }    
         }
@@ -52,7 +57,52 @@ public:
         map.refresh();
     }
 
-    // 게임오버 체크
+    void showGameOver() {
+        clear();
+        attron(A_REVERSE);
+        mvprintw(LINES/2, COLS/2-5, "GAME OVER!");
+        attroff(A_REVERSE);
+        refresh();
+        flushinp();
+        nodelay(stdscr, FALSE);  // 입력 대기 모드 전환
+        getch();
+        nodelay(stdscr, TRUE);   // 논블로킹 모드 복원
+    }
+
+    void showStageClear() {
+        clear();
+        refresh(); // 화면 강제 갱신 추가
+        attron(A_BOLD);
+        mvprintw(LINES/2-1, COLS/2-8, "STAGE CLEAR!");
+        mvprintw(LINES/2+1, COLS/2-15, "Press any key to continue");
+        attroff(A_BOLD);
+        refresh();
+        flushinp();
+        nodelay(stdscr, FALSE);  // 입력 대기 모드 전환
+        getch();
+        nodelay(stdscr, TRUE);   // 논블로킹 모드 복원
+        clear();
+        touchwin(stdscr); // 표준 화면 터치
+        wrefresh(stdscr); // 잔상 제거를 위한 강제 갱신
+    }
+
+    void showGameClear() {
+        clear();
+        refresh(); // 화면 강제 갱신 추가
+        attron(A_BOLD | A_BLINK);
+        mvprintw(LINES/2-1, COLS/2-10, "!!! GAME CLEAR !!!");
+        mvprintw(LINES/2+1, COLS/2-15, "Press any key to exit");
+        attroff(A_BOLD | A_BLINK);
+        refresh();
+        flushinp();
+        nodelay(stdscr, FALSE);  // 입력 대기 모드 전환
+        getch();
+        nodelay(stdscr, TRUE);   // 논블로킹 모드 복원
+        endwin();
+        exit(0);
+    }
+    
+      // 게임오버 체크
     bool checkOver()
     {
         return game_over;
@@ -104,13 +154,13 @@ public:
 
         // Gate 충돌 여부 확인
         if (gateManager.isGate(nextRow, nextCol)) {
-            gateManager.incrementGateUse();  // 게이트 사용 횟수 증가
+            gateManager.incrementGateUse(map);  // 게이트 사용 횟수 증가
             handleGateTeleport(next);
             return;
         }
 
         // 아이템 충돌 여부 확인
-        auto item = itemManager.checkCollision(next);
+        auto item = itemManager.checkCollision(next, map);
         if (item) {  
             handleItemCollision(next, *item);
             return;
@@ -118,6 +168,12 @@ public:
         
         // 벽 또는 몸통 충돌 체크
         if (map.getChar(nextRow, nextCol) != ' ') { 
+            game_over = true;
+            return;
+        }
+
+        // 벽 충돌 검사 추가 (6번 규칙)
+        if (map.getChar(nextRow, nextCol) == '#') {
             game_over = true;
             return;
         }
@@ -163,6 +219,10 @@ public:
                     }    
                 }
                 break;
+
+            case SPEED_UP:
+                moveDelay = std::max(50, moveDelay - 50);  // 최소 50ms 유지
+                break;
         }
     }
 
@@ -188,6 +248,33 @@ public:
         map.addChar(snake.tail().getY(), snake.tail().getX(), ' ');
         snake.removePiece();
     }
+
+    void checkStageClear() {
+        Map::StageMission current = map.missions[current_stage];
+        bool missionB = (map.getCurrentMax() >= current.targetB);
+        bool missionPlus = (map.getGrowth() >= current.targetPlus);
+        bool missionMinus = (map.getPoison() >= current.targetMinus);
+        bool missionG = (map.getGate() >= current.targetG);
+        
+        if(missionB && missionPlus && missionMinus && missionG) {
+            if(current_stage < 4) {
+                showStageClear();                  // 1. 먼저 클리어 메시지 출력
+                current_stage++;
+                clear(); // 화면 초기화 추가
+                wclear(stdscr);  // 표준 화면 완전 초기화
+                refresh();       // 변경사항 즉시 적용
+                map.initialize(current_stage);      // 2. 그 다음 맵과 미션 보드 초기화
+                snake.initialize();
+                itemManager.clear(); // 1. 아이템 벡터 초기화
+                itemManager.update(map, snake); // 2. 즉시 새 맵에 아이템 생성
+                redraw();                          // 3. 화면 강제 리프레시
+            } else {
+                showGameClear();
+            }
+        }
+    }
+
+
 
     // 진출 방향 계산
     Direction determineExitDirection(int y, int x, Direction inDir) {
@@ -226,4 +313,5 @@ public:
         }
         return SnakePiece(y, x, '%');  // fallback
     }
+    
 };

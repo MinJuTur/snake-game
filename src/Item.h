@@ -4,7 +4,8 @@ using namespace std::chrono;
 
 enum ItemType {
     GROWTH,
-    POISON
+    POISON,
+    SPEED_UP
 };
 
 class Item {
@@ -31,7 +32,9 @@ public:
         return duration_cast<seconds>(steady_clock::now() - createdTime).count() >= lifetime;
     }
 
-    char getSymbol() const { 
-        return (type == GROWTH) ? '+' : '-'; 
-    }
+    char getSymbol() const {
+      if (type == GROWTH) return '+';
+      if (type == POISON) return '-';
+      return 'S';  // 5번 규칙: SPEED_UP 심볼 'S' 지정
+  }
 };

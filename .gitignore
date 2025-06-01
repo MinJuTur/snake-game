@@ -31,3 +31,6 @@
 *.out
 *.app
 goorm.manifest
+
+main
+main.exe

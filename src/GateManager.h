@@ -110,8 +110,9 @@ public:
         return gateActive;
     }
 
-    void incrementGateUse() {
+    void incrementGateUse(Map& map) {
         gateUseCount++;
+        map.incrementGate();  // Map에 게이트 사용 횟수 전달
     }
 
     int getGateUseCount() const {

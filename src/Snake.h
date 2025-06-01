@@ -54,6 +54,16 @@ public:
         cur_direction = right;
     }
 
+    bool isOccupying(int y, int x) const {
+      std::queue<SnakePiece> temp = snake;
+      while (!temp.empty()) {
+          if (temp.front().getY() == y && temp.front().getX() == x) 
+              return true;
+          temp.pop();
+      }
+      return false;
+    }
+
     // piece 위치를 큐에 삽입
     void addPiece(SnakePiece piece){
         snake.push(piece);
